@@ -1,4 +1,12 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import {
+  BaseEntity,
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from "typeorm";
 
 export enum EInquiryType {
   PARTNERSHIP = "PARTNERSHIP",
@@ -7,7 +15,7 @@ export enum EInquiryType {
 }
 
 @Entity({ name: "contacts" })
-export class Contact {
+export class Contact extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -33,12 +41,12 @@ export class Contact {
   @Column({ type: "text" })
   message: string;
 
-  @Column({ type: "datetime" })
+  @CreateDateColumn({ type: "datetime" })
   created_at: Date;
 
-  @Column({ type: "datetime" })
+  @UpdateDateColumn({ type: "datetime" })
   updated_at: Date;
 
-  @Column({ type: "datetime", nullable: true })
+  @DeleteDateColumn({ type: "datetime" })
   deleted_at: Date;
 }
