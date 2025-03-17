@@ -10,7 +10,7 @@ export const AppDataSource = new DataSource({
   port: 3306,
   username: "root",
   password: "",
-  database: "express_typeorm",
+  database: "shop",
   // entities: [Contact, Person, Car, Photo],
   entities: ["src/DAL/models/*{.ts,.js}"],
   subscribers: [],

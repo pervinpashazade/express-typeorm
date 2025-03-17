@@ -8,6 +8,9 @@ import { Car } from "./DAL/models/car.model";
 import { Category } from "./DAL/models/category.model";
 import { Question } from "./DAL/models/question.model";
 import { In, Not } from "typeorm";
+import { Promocode } from "./DAL/models/promocode.model";
+import { Home } from "./DAL/models/home.model";
+import moment from "moment";
 
 AppDataSource.initialize()
   .then(() => {
@@ -117,6 +120,138 @@ AppDataSource.initialize()
       });
       res.json(list);
     });
+
+
+    app.post("/promocode/create", async (req: Request, res: Response) => {
+      const {
+        code,
+        from_date,
+        to_date,
+        discount_type,
+        discount_value,
+      } = req.body;
+
+      const newPromocode = new Promocode();
+      newPromocode.code = code;
+      newPromocode.from_date = from_date;
+      newPromocode.to_date = to_date;
+      newPromocode.discount_type = discount_type;
+      newPromocode.discount_value = discount_value;
+
+      const newData = await newPromocode.save();
+
+      res.json(newData);
+
+    });
+
+    app.post("/home/create", async (req: Request, res: Response) => {
+      const {
+        title,
+        price,
+      } = req.body;
+
+      const newHome = new Home();
+      newHome.title = title;
+      newHome.price = price;
+
+      const newData = await newHome.save();
+
+      res.json(newData);
+
+    });
+
+    app.post("/promocode/calculate", async (req: Request, res: Response) => {
+      const { promocode: code, product_id: homeId, quantity } = req.body;
+
+      const promocode = await Promocode.findOne({
+        where: {
+          code: code,
+        },
+      });
+      if (!promocode) {
+        res.status(404).json({ error: "Promocode not found" });
+        return;
+      };
+
+      const product = await Home.findOne({
+        where: {
+          id: homeId,
+        },
+      });
+      if (!product) {
+        res.status(404).json({ error: "Product not found" });
+        return;
+      };
+
+      const total_amount = product.price * quantity; // 100azn * 5 eded = 500azn
+
+      // validate promo & apply discount
+
+      // 1. Check if date is valid
+      const currentDate = moment();
+
+      const isBefore = currentDate.isBefore(promocode.to_date);
+      const isAfter = currentDate.isAfter(promocode.from_date);
+
+      if (!isBefore || !isAfter) {
+        res.status(400).json({
+          error: "Promocode is not valid",
+          today: currentDate.format("DD-MM-YYYY HH:mm"),
+          validDates: {
+            from: moment(promocode.from_date).format("DD-MM-YYYY HH:mm"),
+            to: moment(promocode.to_date).format("DD-MM-YYYY HH:mm"),
+          },
+        });
+        return;
+      }
+
+      // 2. validate order min amount
+      if (promocode.min_order_amount > total_amount) {
+        res.status(400).json({
+          error: `Order total amount is less than required minimum: ${promocode.min_order_amount} AZN. You order total: ${total_amount} AZN`,
+          exception: "Less than minimum",
+        });
+        return;
+      }
+
+      // 15.000 -> 20% (3.000 discount)
+      // 2000 -> 20% (400 discount)
+
+      // 3. validate order max amount
+      if (promocode.max_order_amount < total_amount) {
+        res.status(400).json({
+          error: `Order total amount is more than required maximum: ${promocode.max_order_amount} AZN. You order total: ${total_amount} AZN`,
+          exception: "More than maximum",
+        });
+        return;
+      }
+
+      // Calculate discount and send response
+
+      if (promocode.discount_type === "amount") {
+        res.json({
+          total_amount,
+          promocode_discount: {
+            type: "amount",
+            value: promocode.discount_value,
+          },
+          discount: promocode.discount_value,
+          total_amount_with_discount: total_amount - promocode.discount_value,
+        });
+      } else if (promocode.discount_type === "percentage") {
+        res.json({
+          total_amount,
+          promocode_discount: {
+            type: "percentage",
+            value: promocode.discount_value,
+          },
+          discount: (total_amount * promocode.discount_value) / 100,
+          total_amount_with_discount: total_amount - (total_amount * promocode.discount_value) / 100,
+        });
+      }
+
+    });
+
 
     app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
       console.error(error);
